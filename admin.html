@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Admin Panel</title>
+<style>
+:root{--bg:#05060f;--c:#00e5ff;--p:#a855f7;--t:#e8ecff;--m:#8b93b8}
+*{box-sizing:border-box;margin:0}
+body{background:radial-gradient(circle at 20% 0,#14194a,var(--bg) 60%);color:var(--t);font:16px/1.5 system-ui,sans-serif;min-height:100vh;padding:30px 5vw}
+.wrap{max-width:760px;margin:auto}
+h1{color:var(--c);letter-spacing:2px}
+h3{color:var(--p);margin-bottom:8px}
+.card{background:#0d1230cc;border:1px solid #00e5ff33;border-radius:16px;padding:20px;margin-bottom:18px}
+.card .card{background:#070a1f;padding:14px}
+label{display:block;color:var(--m);font-size:13px;margin:10px 0 4px}
+input,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #00e5ff44;background:#070a1f;color:var(--t);font:inherit}
+.card .card input,.card .card textarea{background:#0d1230}
+input:focus,textarea:focus{outline:none;border-color:var(--c);box-shadow:0 0 12px #00e5ff55}
+textarea{min-height:80px;resize:vertical}
+button{padding:10px 22px;border:0;border-radius:24px;font-weight:700;cursor:pointer;color:#05060f;background:linear-gradient(90deg,var(--c),var(--p));margin:12px 8px 0 0}
+button.g{background:none;border:1px solid var(--c);color:var(--c)}
+button.x{background:#ff4d6d}
+button.sm{padding:6px 14px}
+img{width:110px;height:110px;border-radius:50%;object-fit:cover;border:2px solid var(--c);display:block;margin:8px 0}
+.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+#st,#err{margin-top:12px;color:var(--c)}#err{color:#ff4d6d}
+a{color:var(--c)}
+.bar{position:sticky;bottom:10px;background:#05060fe6;padding:6px 14px 14px;border-radius:16px;border:1px solid #00e5ff33}
+</style></head>
+<body><div class="wrap">
+<div class="top"><h1>⚡ ADMIN PANEL</h1><a href="index.html" target="_blank">View site</a></div>
+
+<div id="login" class="card">
+  <label>Email</label><input id="em" type="email" autocomplete="username">
+  <label>Password</label><input id="pw" type="password" autocomplete="current-password">
+  <button id="li">Login</button><p id="err"></p>
+</div>
+
+<div id="ed" hidden>
+  <div class="card">
+    <h3>Profile</h3>
+    <label>Photo</label><img id="pv" alt=""><input id="ph" type="file" accept="image/*">
+    <label>Name</label><input id="name">
+    <label>Role / title</label><input id="role">
+    <label>Tagline</label><input id="tagline">
+    <label>Resume link (Google Drive / PDF URL). Leave empty to hide the button</label><input id="resume" placeholder="https://...">
+    <label>About me</label><textarea id="about"></textarea>
+  </div>
+  <div id="secs"></div>
+  <div class="card">
+    <h3>Contact</h3>
+    <label>Email</label><input id="email">
+    <label>Location</label><input id="location">
+    <label>Social links (one per line: Name | URL)</label><textarea id="socials"></textarea>
+  </div>
+  <div class="bar"><button id="save">Save changes</button><button class="g" id="out">Logout</button><span id="st"></span></div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const btn=(t,f,c)=>{const b=el('button',c,t);b.onclick=f;return b};
+const F=['name','role','tagline','resume','about','email','location','socials'];
+let data=norm({...DEFAULT});
+const sb=supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey);
+let on=null;
+const show=s=>{if(on===!!s)return;on=!!s;$('login').hidden=on;$('ed').hidden=!on;if(on)load()};
+sb.auth.onAuthStateChange((e,s)=>show(s));
+$('li').onclick=()=>sb.auth.signInWithPassword({email:$('em').value,password:$('pw').value}).then(({error})=>{if(error)$('err').textContent=error.message});
+$('out').onclick=()=>sb.auth.signOut();
+
+// one editor card per section (built from SECTIONS in config.js)
+const boxes={};
+SECTIONS.forEach(s=>{
+  const c=el('div','card'),b=el('div');boxes[s.key]=b;
+  c.append(el('h3',0,s.title),b,btn('+ Add',()=>{(data[s.key]=data[s.key]||[]).push({});rows(s)},'g'));
+  $('secs').append(c)});
+
+function rows(s){
+  const box=boxes[s.key],arr=data[s.key]=data[s.key]||[];box.replaceChildren();
+  arr.forEach((it,i)=>{
+    const d=el('div','card');
+    s.fields.forEach(([k,l,t])=>{
+      const inp=el(t=='area'?'textarea':'input');inp.value=it[k]||'';inp.oninput=()=>it[k]=inp.value;
+      d.append(el('label',0,l),inp)});
+    const mv=j=>()=>{if(arr[j]){[arr[i],arr[j]]=[arr[j],arr[i]];rows(s)}};
+    d.append(btn('↑',mv(i-1),'g sm'),btn('↓',mv(i+1),'g sm'),btn('Delete',()=>{arr.splice(i,1);rows(s)},'x sm'));
+    box.append(d)});
+}
+function fill(){F.forEach(k=>$(k).value=data[k]||'');$('pv').src=data.photo||DEFAULT.photo;SECTIONS.forEach(rows)}
+function load(){
+  sb.from('site_content').select('data').eq('id','main').maybeSingle().then(({data:r,error})=>{
+    if(error)return $('st').textContent=error.message;
+    data=norm({...DEFAULT,...(r?r.data:{})});fill()});
+}
+
+// photo: crop to square, shrink to 480px, store as small JPEG
+$('ph').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const im=new Image();im.onload=()=>{
+    const s=Math.min(im.width,im.height),c=el('canvas');c.width=c.height=480;
+    c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,480,480);
+    data.photo=c.toDataURL('image/jpeg',.82);$('pv').src=data.photo};
+  im.src=URL.createObjectURL(f);
+};
+
+$('save').onclick=()=>{
+  F.forEach(k=>data[k]=$(k).value);
+  $('st').textContent='Saving...';
+  sb.from('site_content').upsert({id:'main',data}).then(({error})=>
+    $('st').textContent=error?'Error: '+error.message:'Saved ✓ Refresh your site.');
+};
+</script>
+</body></html>
